@@ -1,0 +1,12 @@
+# AI assistant config
+CLAUDE.md
+
+# Build outputs
+bin/
+obj/
+
+# IDE
+.vs/
+.idea/
+*.user
+*.suo

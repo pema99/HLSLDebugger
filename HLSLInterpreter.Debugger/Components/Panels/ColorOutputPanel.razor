@@ -1,0 +1,137 @@
+@inherits DebuggerComponent<DebuggerModel>
+
+@{
+    var run = Slice.Run;
+    var config = Slice.Editor.ActiveDocument?.Config ?? new ShaderConfig();
+    bool isGpu = run.Backend == RunBackend.Gpu;
+    bool isRunning = run.Status != RunStatus.Idle;
+    bool isDebugging = Slice.Debug.IsActive;
+    bool showLegend = run.Metrics != null && !isGpu && !isDebugging && run.ViewMode != DebugViewMode.Color;
+}
+<div class="debug-section debug-section-image @(collapsed ? "section-collapsed" : "")">
+    <div class="panel-header collapsible-header" @onclick="() => collapsed = !collapsed">
+        <div class="panel-header-left">
+            <span class="collapse-icon @(collapsed ? "" : "expanded")">&#x203A;</span>
+            <span>Color Output</span>
+        </div>
+        <div class="panel-header-actions" @onclick:stopPropagation="true">
+            @if (showLegend)
+            {
+                <div class="metric-legend-wrap">
+                    <button class="btn-time-ctrl" title="Legend" @onclick="@(() => legendOpen = !legendOpen)">
+                        <i class="mdi mdi-information-outline"></i>
+                    </button>
+                    @if (legendOpen)
+                    {
+                        <div class="metric-legend">
+                            <div class="metric-legend-title">@ModeTitle(run.ViewMode)</div>
+                            <div class="metric-legend-blurb">@ModeBlurb(run.ViewMode)</div>
+                            @if (run.ViewMode == DebugViewMode.NanDetection)
+                            {
+                                <div class="metric-legend-swatches">
+                                    <div class="metric-legend-swatch"><span style="background:#000"></span>Clean</div>
+                                    <div class="metric-legend-swatch"><span style="background:rgb(255,0,0)"></span>NaN</div>
+                                    <div class="metric-legend-swatch"><span style="background:rgb(255,255,0)"></span>+Infinity</div>
+                                    <div class="metric-legend-swatch"><span style="background:rgb(0,255,255)"></span>-Infinity</div>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="metric-legend-bar" style="background:@ExecutionMetrics.TurboCssGradient()"></div>
+                                <div class="metric-legend-scale">
+                                    <span>@run.Metrics.ScaleLabels(run.ViewMode).Low</span>
+                                    <span>@run.Metrics.ScaleLabels(run.ViewMode).High</span>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+            @if (run.Metrics != null && !isGpu && !isDebugging)
+            {
+                <select class="settings-text-input" value="@run.ViewMode" @onchange="OnViewModeChanged">
+                    <option value="@DebugViewMode.Color">Color</option>
+                    <option value="@DebugViewMode.WarpExecutionDivergence">Warp execution divergence</option>
+                    <option value="@DebugViewMode.WarpInstructionCount">Warp instruction count</option>
+                    <option value="@DebugViewMode.WarpAverageUtilization">Warp average utilization</option>
+                    <option value="@DebugViewMode.PixelActiveInstructionCount">Pixel active instruction count</option>
+                    <option value="@DebugViewMode.NanDetection">NaN detection</option>
+                    <option value="@DebugViewMode.TextureFetches">Texture fetches</option>
+                </select>
+            }
+            @if (config.RenderMode == ShaderRenderMode.VertFrag)
+            {
+                <div class="segmented-toggle" role="radiogroup" aria-label="Debug target">
+                    <button type="button" role="radio"
+                            aria-checked="@(config.DebugTarget == DebugTarget.Vertex)"
+                            class="segmented-toggle-option @(config.DebugTarget == DebugTarget.Vertex ? "active" : "")"
+                            @onclick="@(() => Dispatch(new DebugTargetChanged(DebugTarget.Vertex)))">Vert</button>
+                    <button type="button" role="radio"
+                            aria-checked="@(config.DebugTarget == DebugTarget.Pixel)"
+                            class="segmented-toggle-option @(config.DebugTarget == DebugTarget.Pixel ? "active" : "")"
+                            @onclick="@(() => Dispatch(new DebugTargetChanged(DebugTarget.Pixel)))">Frag</button>
+                </div>
+            }
+            @if (isGpu)
+            {
+                <button class="btn-time-ctrl" title="@(run.GpuPaused ? "Play" : "Pause")" @onclick="@(() => Dispatch(new GpuPauseToggled()))">
+                    <i class="mdi @(run.GpuPaused ? "mdi-play" : "mdi-pause")"></i>
+                </button>
+                <button class="btn-time-ctrl" title="Restart time" @onclick="@(() => Dispatch(new GpuTimeRestartRequested()))">
+                    <i class="mdi mdi-restart"></i>
+                </button>
+            }
+            <label class="settings-toggle panel-header-toggle" title="Use GPU">
+                <input type="checkbox" checked="@run.GpuPreviewEnabled" @onchange="OnGpuToggleChanged"
+                       disabled="@(isRunning || isDebugging)" />
+                <span class="settings-toggle-track"><span class="settings-toggle-thumb"></span></span>
+                <span class="panel-header-toggle-label">Use GPU</span>
+            </label>
+        </div>
+    </div>
+    @* Keep the canvas mounted even when collapsed so the GPU loop's references stay valid. *@
+    <CanvasView ContainerId="image-container" ModeTarget="regular" WithGpuCanvas="true"
+                CssClass="@(isGpu ? "gpu-mode" : "")" Hidden="collapsed" />
+    @if (!collapsed)
+    {
+        <div class="resize-v-handle" title="Drag to resize"></div>
+    }
+</div>
+
+@code {
+    protected override DebuggerModel Select(DebuggerModel s) => s;
+
+    private bool collapsed;
+    private bool legendOpen;
+
+    private void OnGpuToggleChanged(ChangeEventArgs e) =>
+        Dispatch(new GpuPreviewToggled(e.Value is bool b && b));
+
+    private void OnViewModeChanged(ChangeEventArgs e)
+    {
+        if (Enum.TryParse<DebugViewMode>(e.Value?.ToString(), out var mode))
+            Dispatch(new ViewModeChanged(mode));
+    }
+
+    private static string ModeTitle(DebugViewMode mode) => mode switch
+    {
+        DebugViewMode.WarpExecutionDivergence => "Warp execution divergence",
+        DebugViewMode.WarpInstructionCount => "Warp instruction count",
+        DebugViewMode.WarpAverageUtilization => "Warp average utilization",
+        DebugViewMode.PixelActiveInstructionCount => "Pixel active instruction count",
+        DebugViewMode.NanDetection => "NaN detection",
+        DebugViewMode.TextureFetches => "Texture fetches",
+        _ => "",
+    };
+
+    private static string ModeBlurb(DebugViewMode mode) => mode switch
+    {
+        DebugViewMode.WarpExecutionDivergence => "Fraction of executed statements where some threads in the warp were inactive.",
+        DebugViewMode.WarpInstructionCount => "Total statements executed per warp.",
+        DebugViewMode.WarpAverageUtilization => "Average fraction of inactive threads across the warp's execution.",
+        DebugViewMode.PixelActiveInstructionCount => "Total statements executed while each pixel's thread was active.",
+        DebugViewMode.NanDetection => "Highlights pixels that used non-finite values in computations.",
+        DebugViewMode.TextureFetches => "Total texture and buffer fetches per pixel.",
+        _ => "",
+    };
+}

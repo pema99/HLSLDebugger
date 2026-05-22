@@ -1,0 +1,3 @@
+[submodule "HLSLInterpreter"]
+	path = HLSLInterpreter
+	url = https://github.com/pema99/HLSLInterpreter

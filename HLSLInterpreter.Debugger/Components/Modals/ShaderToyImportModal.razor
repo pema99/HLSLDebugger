@@ -1,0 +1,76 @@
+@inject DebuggerProgram Program
+
+<div class="modal-overlay" @onclick="Close">
+    <div class="modal-dialog" @onclick:stopPropagation="true" style="max-width: 1100px; width: 90vw;">
+        <div class="modal-header">Import ShaderToy</div>
+        <div class="modal-body">
+            <div class="settings-row" style="align-items: stretch;">
+                <textarea class="settings-text-input" rows="24"
+                          style="min-height: 60vh; width: 100%;"
+                          placeholder="void mainImage(out vec4 fragColor, in vec2 fragCoord) { ... }"
+                          value="@_paste"
+                          @oninput="@(e => _paste = e.Value?.ToString() ?? "")"
+                          disabled="@_busy"></textarea>
+            </div>
+            @if (!string.IsNullOrEmpty(_error))
+            {
+                <div class="settings-row" style="color: #ff7a7a;">@_error</div>
+            }
+        </div>
+        <div class="modal-footer">
+            <button class="btn-modal-save" @onclick="Close" disabled="@_busy">Cancel</button>
+            <button class="btn-modal-save" @onclick="DoImport" disabled="@_busy">
+                @(_busy ? "Importing..." : "Import")
+            </button>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string _paste = "";
+    private string _error = "";
+    private bool _busy;
+
+    private void Close()
+    {
+        if (!_busy) Program.Dispatch(new ModalDismissed());
+    }
+
+    private async Task DoImport()
+    {
+        _error = "";
+        if (string.IsNullOrWhiteSpace(_paste))
+        {
+            _error = "Paste some GLSL first.";
+            return;
+        }
+        _busy = true;
+        try
+        {
+            string hlsl = await BrowserInterop.TranspileGlsl(_paste);
+            Program.Dispatch(new DocumentLoaded(
+                "shadertoy.hlsl", hlsl, ShaderRenderMode.Pixel, "frag", null,
+                DetectChannels(hlsl), Array.Empty<SamplerBinding>(), Run: true));
+        }
+        catch (Exception ex)
+        {
+            _error = "Import failed: " + ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    public static List<TextureBinding> DetectChannels(string hlsl)
+    {
+        var textures = new List<TextureBinding>();
+        for (int i = 0; i < 4; i++)
+        {
+            string name = $"iChannel{i}";
+            if (System.Text.RegularExpressions.Regex.IsMatch(hlsl, $@"\b{name}\b"))
+                textures.Add(new TextureBinding { Name = name });
+        }
+        return textures;
+    }
+}
