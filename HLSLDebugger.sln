@@ -3,11 +3,11 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HLSLInterpreter.Debugger", "HLSLInterpreter.Debugger\HLSLInterpreter.Debugger.csproj", "{41FABF03-5F2B-41E9-B88E-8EC01FB59800}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HLSLDebugger", "HLSLDebugger\HLSLDebugger.csproj", "{41FABF03-5F2B-41E9-B88E-8EC01FB59800}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HLSLInterpreter.Debugger.Web", "HLSLInterpreter.Debugger.Web\HLSLInterpreter.Debugger.Web.csproj", "{7DB03509-51F8-4208-A1A2-F978CEBBB4F5}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HLSLDebugger.Web", "HLSLDebugger.Web\HLSLDebugger.Web.csproj", "{7DB03509-51F8-4208-A1A2-F978CEBBB4F5}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HLSLInterpreter.Debugger.Desktop", "HLSLInterpreter.Debugger.Desktop\HLSLInterpreter.Debugger.Desktop.csproj", "{E11C0F70-6B4C-46C0-BBD6-916AD2D21DEB}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HLSLDebugger.Desktop", "HLSLDebugger.Desktop\HLSLDebugger.Desktop.csproj", "{E11C0F70-6B4C-46C0-BBD6-916AD2D21DEB}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "HLSLInterpreter", "HLSLInterpreter", "{75CC6DB2-DA3B-3CF9-3849-8EF9C1970838}"
 EndProject

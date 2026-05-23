@@ -1,0 +1,233 @@
+@inherits DebuggerComponent<DebuggerModel>
+@inject NavigationManager Nav
+@inject HostOptionsService Host
+@inject FileDialogService FileDialogs
+@inject IJSRuntime JS
+@using Microsoft.JSInterop
+
+@{
+    var ui = Slice.Ui;
+    var run = Slice.Run;
+    var debug = Slice.Debug;
+    bool debugging = debug.IsActive;
+    bool running = run.Status != RunStatus.Idle;
+    bool cancellable = run.Status == RunStatus.Cancellable;
+    int stepCount = debug.Trace?.Steps.Count ?? 0;
+    bool canFwd = debug.Trace != null && debug.StepIndex < stepCount - 1;
+    bool canBack = debug.Trace != null && debug.StepIndex > 0;
+}
+<div class="app-shell @(ui.BonzomaticMode && !debugging ? "bonzomatic" : "")">
+    <header class="topbar">
+        <div class="topbar-left">
+            <div class="menu-button-wrap">
+                <button class="btn-menu" @onclick="() => _menuOpen = !_menuOpen" title="Menu"><i class="mdi mdi-menu"></i></button>
+                @if (_menuOpen)
+                {
+                    <div class="menu-backdrop" @onclick="() => _menuOpen = false"></div>
+                    @* Any click inside the dropdown bubbles here and closes the menu. *@
+                    <div class="menu-dropdown" @onclick="() => _menuOpen = false">
+                        @if (Host.TabsEnabled)
+                        {
+                            <button class="menu-item" @onclick="@(() => Dispatch(new ModalRequested(ModalKind.NewFile)))">New file</button>
+                            <button class="menu-item" @onclick="@(() => Dispatch(new OpenFileRequested()))">Open file</button>
+                            <button class="menu-item" @onclick="@(() => Dispatch(new SaveFileRequested(true)))">Save as</button>
+                            <button class="menu-item" @onclick="@(() => Dispatch(new SaveFileRequested(false)))">Save</button>
+                            <div class="menu-divider"></div>
+                        }
+                        <button class="menu-item" @onclick="@(() => Dispatch(new ModalRequested(ModalKind.Examples)))">Example shaders</button>
+                        <button class="menu-item" @onclick="@(() => Dispatch(new ModalRequested(ModalKind.ShaderToyImport)))">Import ShaderToy</button>
+                        <button class="menu-item menu-item-toggle" @onclick="@(() => Dispatch(new BonzomaticToggled()))">
+                            <span>Bonzomatic mode</span>
+                            <span class="menu-item-check">@(ui.BonzomaticMode ? "✓" : "")</span>
+                        </button>
+                        <div class="menu-divider"></div>
+                        <button class="menu-item" @onclick="CopyPermalink">Copy permalink</button>
+                        <button class="menu-item" @onclick="@(() => Dispatch(new DownloadRequested()))">Download current file</button>
+                        <div class="menu-divider"></div>
+                        <button class="menu-item" @onclick="@(() => Dispatch(new ModalRequested(ModalKind.Hotkeys)))">Hotkeys</button>
+                        <button class="menu-item" @onclick="@(() => Dispatch(new ModalRequested(ModalKind.Textures)))">Textures</button>
+                        <button class="menu-item" @onclick="@(() => Dispatch(new ModalRequested(ModalKind.Settings)))">Settings</button>
+                    </div>
+                }
+            </div>
+            <a class="topbar-title" href="https://github.com/pema99/HLSLDebugger" target="_blank" rel="noopener noreferrer" title="View on GitHub">HLSLDebugger</a>
+        </div>
+
+        <div class="topbar-center">
+            @if (debugging)
+            {
+                <div class="debug-controls">
+                    <button class="btn-dbg btn-dbg-continue" data-dbg="continue" @onclick="@(() => Dispatch(new StepRequested(StepKind.Continue)))" disabled="@(!canFwd)" title="Continue (F5)"><i class="mdi mdi-play-outline"></i></button>
+                    <button class="btn-dbg" data-dbg="step-over" @onclick="@(() => Dispatch(new StepRequested(StepKind.Over)))" disabled="@(!canFwd)" title="Step over (F10)"><i class="mdi mdi-debug-step-over"></i></button>
+                    <button class="btn-dbg" data-dbg="step-in" @onclick="@(() => Dispatch(new StepRequested(StepKind.In)))" disabled="@(!canFwd)" title="Step in (F11)"><i class="mdi mdi-debug-step-into icon-step-into"></i></button>
+                    <button class="btn-dbg" data-dbg="step-out" @onclick="@(() => Dispatch(new StepRequested(StepKind.Out)))" disabled="@(!canFwd)" title="Step out (F12)"><i class="mdi mdi-debug-step-out icon-step-out"></i></button>
+                    <div class="dbg-controls-sep"></div>
+                    <button class="btn-dbg btn-dbg-continue-back" data-dbg="continue-back" @onclick="@(() => Dispatch(new StepRequested(StepKind.ContinueBack)))" disabled="@(!canBack)" title="Continue back (Shift+F5)"><i class="mdi mdi-play-outline btn-icon-mirror"></i></button>
+                    <button class="btn-dbg" data-dbg="step-over-back" @onclick="@(() => Dispatch(new StepRequested(StepKind.OverBack)))" disabled="@(!canBack)" title="Step over back (Shift+F10)"><i class="mdi mdi-debug-step-over btn-icon-mirror"></i></button>
+                    <button class="btn-dbg" data-dbg="step-in-back" @onclick="@(() => Dispatch(new StepRequested(StepKind.InBack)))" disabled="@(!canBack)" title="Step in back (Shift+F11)"><i class="mdi mdi-debug-step-into icon-step-into-back"></i></button>
+                    <button class="btn-dbg" data-dbg="step-out-back" @onclick="@(() => Dispatch(new StepRequested(StepKind.OutBack)))" disabled="@(!canBack)" title="Step out back (Shift+F12)"><i class="mdi mdi-debug-step-out icon-step-out-back"></i></button>
+                </div>
+            }
+        </div>
+
+        <div class="topbar-right">
+            <div class="share-button-wrap">
+                <button class="btn-share" @onclick="CopyPermalink" title="Copy permalink to clipboard"><i class="mdi mdi-share-variant"></i></button>
+                @if (ui.PermalinkToastKey > 0)
+                {
+                    <span class="permalink-toast" @key="ui.PermalinkToastKey">Permalink copied to clipboard</span>
+                }
+            </div>
+            <button class="btn-run" @onclick="RunOrCancel"
+                    disabled="@((running && !cancellable) || debugging)"
+                    title="@(cancellable ? "Stop" : "Run")">
+                @if (running)
+                {
+                    <span class="spinner"></span>
+                }
+                else
+                {
+                    <i class="mdi mdi-play"></i>
+                }
+            </button>
+            @if (debugging)
+            {
+                <button class="btn-stop" @onclick="@(() => Dispatch(new DebugExitRequested()))" title="Stop debugging"><i class="mdi mdi-stop"></i></button>
+            }
+            else
+            {
+                <button class="btn-debug-start" @onclick="@(() => Dispatch(new DebugRequested()))" disabled="@running" title="Debug (record execution trace)"><i class="mdi mdi-bug-outline"></i></button>
+            }
+        </div>
+    </header>
+
+    <div class="main-split">
+        <EditorPanel InitialCode="@_initialCode" OnReady="OnEditorReady" />
+
+        <div class="resize-h-handle" title="Drag to resize"></div>
+
+        <div class="output-panel">
+            @if (debugging)
+            {
+                <VariablesPanel />
+                <CallStackPanel />
+                <ImmediatePanel />
+                <ConsolePanel Variant="ConsolePanel.ConsoleVariant.Debug"
+                              HasError="@(run.Error != null)" ErrorMessage="@(run.Error?.Message ?? "")"
+                              Output="@(debug.Trace?.OutputThrough(debug.StepIndex) ?? "")" />
+                <div class="debug-panel-spacer"></div>
+            }
+            else
+            {
+                <ColorOutputPanel />
+                <ConsolePanel Variant="ConsolePanel.ConsoleVariant.Run"
+                              HasError="@(run.Error != null)" ErrorMessage="@(run.Error?.Message ?? "")"
+                              Output="@run.Output" IsGpuPreview="@run.GpuPreviewEnabled" />
+                <div class="debug-panel-spacer"></div>
+            }
+        </div>
+    </div>
+</div>
+
+@if (ui.OpenModal == ModalKind.Settings) { <SettingsModal /> }
+@if (ui.OpenModal == ModalKind.Hotkeys) { <HotkeysModal /> }
+@if (ui.OpenModal == ModalKind.Textures) { <TexturesModal /> }
+@if (ui.OpenModal == ModalKind.Examples) { <ExamplesModal /> }
+@if (ui.OpenModal == ModalKind.ShaderToyImport) { <ShaderToyImportModal /> }
+@if (ui.OpenModal == ModalKind.NewFile) { <NewFileModal /> }
+
+@code {
+    protected override DebuggerModel Select(DebuggerModel s) => s;
+
+    private DotNetObjectReference<JsCommands> _dotNetRef;
+    private string _pendingShaderToy;
+    private string _initialCode = "";
+    private bool _menuOpen;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        JsInterop.Js = JS;
+        _dotNetRef = DotNetObjectReference.Create(new JsCommands(Program));
+
+        if (Host.TabsEnabled)
+            FileDialogs.FileDropped = (name, content, path) =>
+            {
+                Dispatch(new FileOpened(name, path, content));
+                return Task.CompletedTask;
+            };
+
+        var shaderToyParam = PermalinkCodec.GetQueryParam(Nav.Uri, "shadertoy");
+        if (!string.IsNullOrEmpty(shaderToyParam))
+        {
+            try { _pendingShaderToy = PermalinkCodec.DecompressCode(shaderToyParam); }
+            catch (Exception ex) { Console.WriteLine("[shadertoy-url] decode failed: " + ex.Message); }
+        }
+
+        _initialCode = string.IsNullOrEmpty(Host.InitialCode) ? DefaultShader.Code : Host.InitialCode;
+        var codeParam = PermalinkCodec.GetQueryParam(Nav.Uri, "c");
+        if (!string.IsNullOrEmpty(codeParam))
+        {
+            try { _initialCode = PermalinkCodec.DecompressCode(codeParam); }
+            catch (Exception ex) { Console.WriteLine("[permalink] code decode failed: " + ex.Message); }
+        }
+
+        Dispatch(new AppStarted(Nav.Uri, Host.InitialName, Host.InitialPath, Host.TabsEnabled));
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Load the monkey mesh before the first render
+        try
+        {
+            string objText = await BrowserInterop.FetchText("_content/HLSLDebugger/lib/monkey.obj");
+            Dispatch(new DefaultMeshLoaded(Mesh.ParseObj(objText)));
+        }
+        catch (Exception ex) { Console.WriteLine("[default-mesh] " + ex.Message); }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await BrowserInterop.SetDebuggerRef(_dotNetRef);
+        }
+    }
+
+    private async Task OnEditorReady()
+    {
+        if (_pendingShaderToy != null)
+        {
+            string glsl = _pendingShaderToy;
+            _pendingShaderToy = null;
+            try
+            {
+                string hlsl = await BrowserInterop.TranspileGlsl(glsl);
+                Dispatch(new DocumentLoaded(
+                    "shadertoy.hlsl", hlsl, ShaderRenderMode.Pixel, "frag", null,
+                    ShaderToyImportModal.DetectChannels(hlsl), Array.Empty<SamplerBinding>(), Run: true));
+                return;
+            }
+            catch (Exception ex) { Console.WriteLine("[shadertoy-url] " + ex.Message); }
+        }
+        Dispatch(new RunRequested());
+    }
+
+    private void RunOrCancel()
+    {
+        if (Slice.Run.Status == RunStatus.Cancellable) Dispatch(new RunCancelRequested());
+        else Dispatch(new RunRequested());
+    }
+
+    private void CopyPermalink()
+    {
+        string baseUrl = Host.PermalinkUrl ?? new Uri(Nav.Uri).GetLeftPart(UriPartial.Path);
+        Dispatch(new PermalinkCopyRequested(baseUrl));
+    }
+
+    public override void Dispose()
+    {
+        _dotNetRef?.Dispose();
+        base.Dispose();
+    }
+}
