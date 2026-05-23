@@ -472,6 +472,44 @@ export function initMonaco(containerId, docId, initialCode) {
             stickyScroll: { enabled: false },
         });
 
+        // Hotkeys when the Monaco editor has focus. Registering as Monaco commands
+        // also suppresses browser defaults (e.g. F11 fullscreen).
+        function clickDbg(action) {
+            var btn = document.querySelector('[data-dbg="' + action + '"]');
+            if (btn && !btn.disabled) btn.click();
+        }
+        function clickDbgOrToggleBonzomaticEditor(action) {
+            var btn = document.querySelector('[data-dbg="' + action + '"]');
+            if (btn && !btn.disabled) { btn.click(); return; }
+            var shell = document.querySelector('.app-shell.bonzomatic');
+            if (shell) shell.classList.toggle('editor-hidden');
+        }
+        function toggleBreakpointAtCursor() {
+            var ref = getDebuggerRef();
+            if (_monacoEditor && ref) {
+                var pos = _monacoEditor.getPosition();
+                if (pos) ref.invokeMethodAsync('ToggleBreakpoint', pos.lineNumber);
+            }
+        }
+        _monacoEditor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, function () {
+            var btn = document.querySelector('.btn-run');
+            if (btn && !btn.disabled) btn.click();
+        });
+        _monacoEditor.addCommand(monaco.KeyCode.F5, function () {
+            var cont = document.querySelector('[data-dbg="continue"]');
+            var run = document.querySelector('.btn-run');
+            if (cont && !cont.disabled) cont.click();
+            else if (run && !run.disabled) run.click();
+        });
+        _monacoEditor.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.F5, function () { clickDbg('continue-back'); });
+        _monacoEditor.addCommand(monaco.KeyCode.F9, function () { toggleBreakpointAtCursor(); });
+        _monacoEditor.addCommand(monaco.KeyCode.F10, function () { clickDbgOrToggleBonzomaticEditor('step-over'); });
+        _monacoEditor.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.F10, function () { clickDbg('step-over-back'); });
+        _monacoEditor.addCommand(monaco.KeyCode.F11, function () { clickDbg('step-in'); });
+        _monacoEditor.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.F11, function () { clickDbg('step-in-back'); });
+        _monacoEditor.addCommand(monaco.KeyCode.F12, function () { clickDbg('step-out'); });
+        _monacoEditor.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.F12, function () { clickDbg('step-out-back'); });
+
         // Drag-and-drop a file onto the editor to open it
         var editorDom = document.getElementById(containerId);
         editorDom.addEventListener('dragover', function (e) { e.preventDefault(); });

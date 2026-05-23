@@ -1,8 +1,27 @@
 using System.IO;
+using System.Reflection;
+using System.Windows;
+using System.Windows.Input;
 using BlazorDesktop.Hosting;
+using BlazorDesktop.Wpf;
 using HLSLInterpreter.Debugger.Desktop;
 using HLSLInterpreter.Debugger.Core;
 using HLSLInterpreter.Debugger.Services;
+
+var keyDownInfo = typeof(BlazorDesktopWindow)
+    .GetMethod("WindowKeyDown", BindingFlags.Instance | BindingFlags.NonPublic);
+if (keyDownInfo != null)
+{
+    EventManager.RegisterClassHandler(
+        typeof(BlazorDesktopWindow),
+        FrameworkElement.LoadedEvent,
+        new RoutedEventHandler((sender, _) =>
+        {
+            var window = (BlazorDesktopWindow)sender;
+            var handler = (KeyEventHandler)keyDownInfo.CreateDelegate(typeof(KeyEventHandler), window);
+            window.KeyDown -= handler;
+        }));
+}
 
 var builder = BlazorDesktopHostBuilder.CreateDefault(args);
 
