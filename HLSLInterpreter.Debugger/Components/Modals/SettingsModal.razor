@@ -5,7 +5,7 @@
     bool locked = Slice.Run.Status != RunStatus.Idle || Slice.Debug.IsActive;
 }
 <div class="modal-overlay" @onclick="Close">
-    <div class="modal-dialog" @onclick:stopPropagation="true">
+    <div class="modal-dialog settings-dialog" @onclick:stopPropagation="true">
         <div class="modal-header">Settings</div>
         <div class="modal-body">
             <div class="settings-row">

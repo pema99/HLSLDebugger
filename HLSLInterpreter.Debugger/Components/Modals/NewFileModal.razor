@@ -3,7 +3,7 @@
 <div class="modal-overlay" @onclick="Close">
     <div class="modal-dialog" @onclick:stopPropagation="true">
         <div class="modal-header">New file</div>
-        <div class="modal-body example-list">
+        <div class="modal-body example-list single-column">
             @foreach (var t in Templates)
             {
                 <button class="example-item" @onclick="@(() => Pick(t))">

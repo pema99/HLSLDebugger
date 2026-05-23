@@ -810,12 +810,22 @@ public sealed class DebuggerProgram : IDisposable
 
     private static DebuggerModel AddDoc(DebuggerModel m, string name, string path = null)
     {
+        var active = m.Editor.ActiveDocument?.Config;
+        var defaults = new ShaderConfig();
         var doc = new ShaderDocument
         {
             Id = m.Editor.NextDocumentId,
             Name = name,
             Path = path,
-            Config = new ShaderConfig { Mesh = m.Editor.DefaultMesh },
+            Config = new ShaderConfig
+            {
+                Mesh = m.Editor.DefaultMesh,
+                CpuMode = active?.CpuMode ?? defaults.CpuMode,
+                WarpX = active?.WarpX ?? defaults.WarpX,
+                WarpY = active?.WarpY ?? defaults.WarpY,
+                GroupOffsetX = active?.GroupOffsetX ?? defaults.GroupOffsetX,
+                GroupOffsetY = active?.GroupOffsetY ?? defaults.GroupOffsetY,
+            },
         };
         var documents = m.Editor.Documents.Append(doc).ToArray();
         return m with

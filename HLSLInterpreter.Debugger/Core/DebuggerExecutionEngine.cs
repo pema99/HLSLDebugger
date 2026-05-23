@@ -491,6 +491,8 @@ public sealed class DebuggerExecutionEngine
             {
                 if (stepCount == stepIndex)
                 {
+                    // Detach so statements inside the expression do not re-enter us.
+                    runner.DebugHookBeforeStatement = null;
                     try { result = runner.EvaluateExpression(expression); }
                     catch (Exception ex) { evalError = ex; }
                     throw new OperationCanceledException();

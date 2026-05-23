@@ -12,6 +12,7 @@
                      draggable="true"
                      @onclick="() => Dispatch(new TabSwitchRequested(idx))"
                      @ondragstart="() => _draggedTab = idx"
+                     @ondragover="OnTabDragOver"
                      @ondragover:preventDefault="true"
                      @ondrop="(e) => OnTabDrop(e, idx)"
                      @ondragend="() => _draggedTab = -1">
@@ -20,6 +21,7 @@
                 </div>
             }
             <div class="editor-tabs-rest"
+                 @ondragover="OnTabDragOver"
                  @ondragover:preventDefault="true"
                  @ondrop="OnTabDropEnd"></div>
         </div>
@@ -65,4 +67,5 @@
         if (from >= 0) Dispatch(new TabMoveRequested(from, Slice.Documents.Count));
     }
 
+    private void OnTabDragOver() { }
 }

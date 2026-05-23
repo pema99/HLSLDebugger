@@ -365,32 +365,32 @@ export function initMonaco(containerId, docId, initialCode) {
                     if (!word) return null;
                     var info = await ref.invokeMethodAsync('GetHoverInfo', word.word);
                     if (info == null) return null;
-                    var contents = [{ value: '```\n' + word.word + ' = ' + info.value + '\n```' }];
+                    var multiline = info.value.indexOf('\n') >= 0;
+                    var assignment = multiline
+                        ? word.word + ' =\n' + info.value
+                        : word.word + ' = ' + info.value;
+                    var contents = [{ value: '```\n' + assignment + '\n```' }];
                     if (info.perThreadValues) {
                         var rgba = info.rgba;
                         var lines = info.perThreadValues.map(function (v, i) {
-                            var swatch = '   ';
+                            var swatch = '';
                             if (rgba && rgba.length >= (i + 1) * 4) {
                                 var r = rgba[i*4], g = rgba[i*4+1], b = rgba[i*4+2];
                                 var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10">'
                                     + '<rect width="10" height="10" fill="rgb(' + r + ',' + g + ',' + b + ')" stroke="#555"/></svg>';
                                 var url = 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
-                                swatch = '<img src="' + url + '" width="10" height="10" />';
+                                swatch = '![](' + url + ') ';
                             }
-                            return swatch + ' [' + i + '] ' + v;
-                        }).join('<br/>');
-                        contents.push({
-                            value: lines,
-                            supportHtml: true,
-                            isTrusted: true,
-                        });
+                            // Two trailing spaces + \n is a markdown hard break.
+                            if (v.indexOf('\n') >= 0) {
+                                return swatch + '[' + i + ']  \n' + v.replace(/\n/g, '  \n');
+                            }
+                            return swatch + '[' + i + '] ' + v;
+                        }).join('  \n');
+                        contents.push({ value: lines, isTrusted: true });
                     } else if (info.rgba && info.width > 0 && info.height > 0) {
                         var url = rgbaToDataUrl(info.rgba, info.width, info.height, info.inspectedX, info.inspectedY);
-                        contents.push({
-                            value: `<img src="${url}" />`,
-                            supportHtml: true,
-                            isTrusted: true,
-                        });
+                        contents.push({ value: '![](' + url + ')', isTrusted: true });
                     }
                     return {
                         range: new monaco.Range(position.lineNumber, word.startColumn, position.lineNumber, word.endColumn),

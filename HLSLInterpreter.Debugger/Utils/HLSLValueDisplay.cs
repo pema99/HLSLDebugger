@@ -52,6 +52,37 @@ public static class HLSLValueDisplay
         return $"[{mv.Rows}×{mv.Columns}]";
     }
 
+    public static string FormatMatrixRows(MatrixValue mv, int threadIndex)
+    {
+        try
+        {
+            int idx = Math.Min(threadIndex, mv.ThreadCount - 1);
+            RawValue[] all = mv.Values.Get(idx);
+            if (all == null) return "(null)";
+            var rows = new string[mv.Rows];
+            for (int r = 0; r < mv.Rows; r++)
+            {
+                var cols = new string[mv.Columns];
+                for (int c = 0; c < mv.Columns; c++)
+                    cols[c] = FormatRawValueFixed(all[r * mv.Columns + c], mv.Type);
+                rows[r] = "(" + string.Join(", ", cols) + ")";
+            }
+            return string.Join("\n", rows);
+        }
+        catch { return "?"; }
+    }
+
+    public static string FormatRawValueFixed(RawValue rv, ScalarType type)
+    {
+        if (HLSLTypeUtils.IsInt(type)) return rv.Int.ToString(CultureInfo.InvariantCulture);
+        if (HLSLTypeUtils.IsUint(type)) return rv.Uint.ToString(CultureInfo.InvariantCulture);
+        if (type == ScalarType.Double) return rv.Double.ToString("F2", CultureInfo.InvariantCulture);
+        if (HLSLTypeUtils.IsFloat(type)) return rv.Float.ToString("F2", CultureInfo.InvariantCulture);
+        if (type == ScalarType.Bool) return rv.Bool.ToString(CultureInfo.InvariantCulture);
+        if (type == ScalarType.Char) return rv.Char.ToString(CultureInfo.InvariantCulture);
+        return rv.Int.ToString(CultureInfo.InvariantCulture);
+    }
+
     public static string FormatStruct(StructValue sv, int threadIndex)
     {
         try
@@ -185,7 +216,10 @@ public static class HLSLValueDisplay
 
         string[] perThread = null;
         if (debugVertexIndex >= 0)
-            perThread = Enumerable.Range(0, wx * wy).Select(i => Format(resolved, i)).ToArray();
+        {
+            perThread = Enumerable.Range(0, wx * wy).Select(i =>
+                resolved is MatrixValue mv ? FormatMatrixRows(mv, i) : Format(resolved, i)).ToArray();
+        }
 
         return new HoverInfo
         {
