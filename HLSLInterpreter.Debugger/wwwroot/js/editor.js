@@ -626,10 +626,12 @@ export function setBreakpoints(docId, lines) {
                 glyphMarginClassName: 'dbg-breakpoint-glyph',
                 glyphMarginHoverMessage: { value: 'Breakpoint' },
                 overviewRuler: { color: '#e51400', position: monaco.editor.OverviewRulerLane.Left },
+                stickiness: monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges,
             }
         };
     });
     e.bpIds = e.model.deltaDecorations(e.bpIds, decorations);
+    e.lastBpLines = (lines || []).slice().sort(function (a, b) { return a - b; }).join(',');
 };
 
 // Highlight the current debug line (0 to clear)
@@ -661,7 +663,21 @@ export function createModel(id, content) {
     var existing = _models.get(id);
     if (existing) { existing.model.setValue(content); return; }
     var model = monaco.editor.createModel(content, 'hlsl');
-    _models.set(id, { model: model, bpIds: [], lineIds: [] });
+    var entry = { model: model, bpIds: [], lineIds: [], lastBpLines: '' };
+    _models.set(id, entry);
+    model.onDidChangeContent(function () {
+        if (!entry.bpIds.length) return;
+        var lines = entry.bpIds
+            .map(function (decId) { return model.getDecorationRange(decId); })
+            .filter(function (r) { return r != null; })
+            .map(function (r) { return r.startLineNumber; });
+        lines = Array.from(new Set(lines)).sort(function (a, b) { return a - b; });
+        var key = lines.join(',');
+        if (key === entry.lastBpLines) return;
+        entry.lastBpLines = key;
+        var ref = getDebuggerRef();
+        if (ref) ref.invokeMethodAsync('SyncBreakpoints', id, lines);
+    });
 };
 
 export function showModel(id) {

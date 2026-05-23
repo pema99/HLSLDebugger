@@ -35,6 +35,7 @@ public sealed record DebugTraceRecorded(
 public sealed record DebugExitRequested : Msg;
 public sealed record StepRequested(StepKind Kind) : Msg;
 public sealed record BreakpointToggled(int Line) : Msg;
+public sealed record BreakpointsSynced(int DocumentId, int[] Lines) : Msg;
 public sealed record SelectedFrameChanged(int Frame) : Msg;
 public sealed record InspectedThreadChanged(int Thread) : Msg;
 public sealed record InspectedPixelChanged(int Px, int Py) : Msg;

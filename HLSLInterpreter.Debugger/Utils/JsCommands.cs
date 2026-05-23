@@ -14,6 +14,10 @@ public sealed class JsCommands
     public void ToggleBreakpoint(int line) => _program.Dispatch(new BreakpointToggled(line));
 
     [JSInvokable]
+    public void SyncBreakpoints(int docId, int[] lines) =>
+        _program.Dispatch(new BreakpointsSynced(docId, lines));
+
+    [JSInvokable]
     public void LoadObjMesh(string objText) => _program.Dispatch(new ObjMeshLoaded(objText));
 
     [JSInvokable]

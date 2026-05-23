@@ -398,6 +398,19 @@ public sealed class DebuggerProgram : IDisposable
                 break;
             }
 
+            case BreakpointsSynced x:
+            {
+                var docs = model.Editor.Documents.ToArray();
+                int idx = -1;
+                for (int i = 0; i < docs.Length; i++)
+                    if (docs[i].Id == x.DocumentId) { idx = i; break; }
+                if (idx < 0) { next = model; command = Cmd.None; break; }
+                docs[idx] = docs[idx] with { Breakpoints = new HashSet<int>(x.Lines) };
+                next = model with { Editor = model.Editor with { Documents = docs } };
+                command = Cmd.None;
+                break;
+            }
+
             case SelectedFrameChanged x:
                 next = model with { Debug = model.Debug with { SelectedFrame = Math.Max(0, x.Frame) } };
                 command = Cmd.None;
