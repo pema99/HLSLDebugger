@@ -1,5 +1,5 @@
 # HLSLDebugger
-Check out the [web demo here](https://pema.dev/hlsl/)!
+HLSLDebugger is available as [a website](https://pema.dev/hlsl/) or a [standalone desktop program](https://github.com/pema99/HLSLDebugger/releases/).
 
 This is a debugger for HLSL code. HLSLDebugger can run HLSL either on the CPU using [HLSLInterpreter](https://github.com/pema99/HLSLInterpreter), or on the GPU using WebGPU. It supports typical debugging workflows with breakpoints and stepping, and can debug both fragment and vertex shaders. To start debugging, simply click on a pixel or vertex in the viewport.
 
