@@ -47,7 +47,7 @@ builder.Services.AddSingleton<ImageLibraryService>();
 builder.Services.AddSingleton(sp => new DebuggerProgram(
     new DebuggerExecutionEngine(), sp.GetRequiredService<FileDialogService>()));
 
-builder.Window.UseTitle("HLSL Interpreter");
+builder.Window.UseTitle("HLSLDebugger");
 builder.Window.UseWidth(1600);
 builder.Window.UseHeight(900);
 
