@@ -190,7 +190,7 @@ public sealed class DebuggerProgram : IDisposable
                         Metrics = x.Metrics,
                     }
                 };
-                command = Cmd.None;
+                command = SetCompileMarker(next);
                 break;
 
             case GpuPauseToggled:
@@ -310,7 +310,7 @@ public sealed class DebuggerProgram : IDisposable
                 if (!canDebug)
                 {
                     next = model with { Run = run with { Error = new RunError(trace.ErrorMessage, trace.Exception) } };
-                    command = Cmd.None;
+                    command = SetCompileMarker(next);
                     break;
                 }
                 if (trace.HasError)
@@ -330,7 +330,10 @@ public sealed class DebuggerProgram : IDisposable
                 };
                 next = model with { Run = run, Debug = debug };
                 command = Cmd.Batch(
-                    Cmd.OfValueTask(() => EditorInterop.SetReadOnly(true)), HighlightCmd(next), ThemeCmd(next));
+                    Cmd.OfValueTask(() => EditorInterop.SetReadOnly(true)),
+                    HighlightLine(next),
+                    SetTheme(next),
+                    SetCompileMarker(next));
                 break;
             }
 
@@ -339,7 +342,7 @@ public sealed class DebuggerProgram : IDisposable
                 command = Cmd.Batch(
                     Cmd.OfValueTask(() => EditorInterop.SetReadOnly(false)),
                     Cmd.OfValueTask(() => EditorInterop.HighlightLine(0)),
-                    ThemeCmd(next),
+                    SetTheme(next),
                     FetchEditorText(code => new RunStarted(code)));
                 break;
 
@@ -382,7 +385,7 @@ public sealed class DebuggerProgram : IDisposable
                     _ => from,
                 };
                 next = next with { Debug = next.Debug with { StepIndex = index, SelectedFrame = 0 } };
-                cmds.Add(HighlightCmd(next));
+                cmds.Add(HighlightLine(next));
                 command = Cmd.Batch(cmds);
                 break;
             }
@@ -466,7 +469,7 @@ public sealed class DebuggerProgram : IDisposable
                     break;
                 }
                 next = model with { Editor = model.Editor with { ActiveIndex = x.Index } };
-                command = Cmd.Batch(Cmd.OfValueTask(() => EditorInterop.ShowModel(next.Editor.ActiveDocument.Id)), HighlightCmd(next));
+                command = Cmd.Batch(Cmd.OfValueTask(() => EditorInterop.ShowModel(next.Editor.ActiveDocument.Id)), HighlightLine(next));
                 break;
 
             case TabCloseRequested x:
@@ -502,7 +505,7 @@ public sealed class DebuggerProgram : IDisposable
                 if (activeChanges)
                 {
                     cmds.Add(Cmd.OfValueTask(() => EditorInterop.ShowModel(next.Editor.ActiveDocument.Id)));
-                    cmds.Add(HighlightCmd(next));
+                    cmds.Add(HighlightLine(next));
                 }
                 command = Cmd.Batch(cmds);
                 break;
@@ -589,7 +592,7 @@ public sealed class DebuggerProgram : IDisposable
                 {
                     if (existing == model.Editor.ActiveIndex) { next = model; command = Cmd.None; break; }
                     next = model with { Editor = model.Editor with { ActiveIndex = existing } };
-                    command = Cmd.Batch(Cmd.OfValueTask(() => EditorInterop.ShowModel(next.Editor.ActiveDocument.Id)), HighlightCmd(next));
+                    command = Cmd.Batch(Cmd.OfValueTask(() => EditorInterop.ShowModel(next.Editor.ActiveDocument.Id)), HighlightLine(next));
                     break;
                 }
                 next = AddDoc(model, x.Name, string.IsNullOrEmpty(x.Path) ? null : x.Path);
@@ -754,7 +757,7 @@ public sealed class DebuggerProgram : IDisposable
                     next = next with { Run = next.Run with { GpuPreviewEnabled = true } };
                     cmds.Add(FetchEditorText(code => new RunStarted(code)));
                 }
-                cmds.Add(ThemeCmd(next));
+                cmds.Add(SetTheme(next));
                 command = Cmd.Batch(cmds);
                 break;
             }
@@ -877,7 +880,7 @@ public sealed class DebuggerProgram : IDisposable
         return m with { Debug = m.Debug with { InspectedThread = Math.Clamp(thread, 0, max) } };
     }
 
-    private Cmd HighlightCmd(DebuggerModel m)
+    private Cmd HighlightLine(DebuggerModel m)
     {
         if (!m.Debug.IsActive) return Cmd.OfValueTask(() => EditorInterop.HighlightLine(0));
         bool onDoc = m.Editor.ActiveDocument?.Id == m.Debug.DebugDocumentId;
@@ -885,9 +888,19 @@ public sealed class DebuggerProgram : IDisposable
         return Cmd.OfValueTask(() => EditorInterop.HighlightLine(line));
     }
 
-    private Cmd ThemeCmd(DebuggerModel m) =>
+    private Cmd SetTheme(DebuggerModel m) =>
         Cmd.OfValueTask(() => EditorInterop.SetTheme(
             m.Ui.BonzomaticMode && !m.Debug.IsActive ? "hlsl-bonzomatic" : "hlsl-dark"));
+
+    private static Cmd SetCompileMarker(DebuggerModel model)
+    {
+        var doc = model.Editor.ActiveDocument;
+        if (doc == null) return Cmd.None;
+        var markers = model.Run.Error is { } err
+            ? DiagnosticMarkers.Parse(err.Message)
+            : Array.Empty<DiagnosticMarker>();
+        return Cmd.OfValueTask(() => EditorInterop.SetCompileMarkers(doc.Id, markers));
+    }
 
     private Cmd FetchEditorText(Func<string, Msg> then) =>
         Cmd.OfTask(async () => then(await EditorInterop.GetValue()));

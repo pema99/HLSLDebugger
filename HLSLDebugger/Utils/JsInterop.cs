@@ -49,6 +49,9 @@ public static class EditorInterop
     public static async ValueTask SetBreakpoints(int docId, IReadOnlyList<int> lines) =>
         await (await Module()).InvokeVoidAsync("setBreakpoints", docId, lines);
 
+    public static async ValueTask SetCompileMarkers(int docId, IReadOnlyList<DiagnosticMarker> markers) =>
+        await (await Module()).InvokeVoidAsync("setCompileMarkers", docId, markers);
+
     public static async ValueTask<bool> IsTabDropAfter(int tabIndex, double clientX) =>
         await (await Module()).InvokeAsync<bool>("dbgIsTabDropAfter", tabIndex, clientX);
 }

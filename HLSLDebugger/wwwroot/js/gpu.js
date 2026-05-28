@@ -166,6 +166,12 @@ async function getSlangGlobal() {
     return slangGlobalPromise;
 }
 
+function compileError(message) {
+    const err = new Error(message);
+    err.stack = '';
+    return err;
+}
+
 async function compileToWgsl(hlslSource, vertEntryName, fragEntryName) {
     const [{ slang, globalSession, wgslTarget }, testPreamble] =
         await Promise.all([getSlangGlobal(), getTestPreamble()]);
@@ -179,7 +185,7 @@ async function compileToWgsl(hlslSource, vertEntryName, fragEntryName) {
         userModule = session.loadModuleFromSource(fullSource, 'user', 'user.slang');
         if (!userModule) {
             const e = slang.getLastError();
-            throw new Error('Slang compile error:\n' + (e?.message || 'unknown'));
+            throw compileError('Slang compile error:\n' + (e?.message || 'unknown'));
         }
         vs = userModule.findAndCheckEntryPoint(vertEntryName, SLANG_STAGE_VERTEX);
         if (!vs) throw new Error(`Slang: vertex entry '${vertEntryName}' not found: ` + (slang.getLastError()?.message || ''));
@@ -585,7 +591,7 @@ export async function gpuRender(canvasId, hlslSource, entryPoint, warpX, warpY, 
     if (info && info.messages) {
         const errors = info.messages.filter(m => m.type === 'error');
         if (errors.length > 0) {
-            throw new Error('WGSL compile errors:\n' + errors.map(m => `  ${m.message}`).join('\n'));
+            throw compileError('WGSL compile errors:\n' + errors.map(m => `  ${m.message}`).join('\n'));
         }
     }
 

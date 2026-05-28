@@ -237,8 +237,7 @@ public static class ShaderExecutor
             var errors = program.LoadInto(runner);
             if (errors.Count > 0)
             {
-                string message = string.Join("\n", errors.Select(
-                    d => $"Line {d.Location.Line}, col {d.Location.Column}: {d.Text}"));
+                string message = string.Join("\n", errors.Select(d => d.ToString()));
                 return new RunOutcome(null, capture?.ToString() ?? "", message, null);
             }
             if (!options.ObserveProgramLoad) AttachHooks();

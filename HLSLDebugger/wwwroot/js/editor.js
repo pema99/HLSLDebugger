@@ -1,5 +1,7 @@
 import { rgbaToDataUrl, getDebuggerRef } from './host.js';
 
+const COMPILE_MARKER_OWNER = 'hlsl-compile';
+
 let _monacoEditor = null;
 let _models = new Map();
 let _currentModelId = -1;
@@ -666,6 +668,7 @@ export function createModel(id, content) {
     var entry = { model: model, bpIds: [], lineIds: [], lastBpLines: '' };
     _models.set(id, entry);
     model.onDidChangeContent(function () {
+        monaco.editor.setModelMarkers(model, COMPILE_MARKER_OWNER, []);
         if (!entry.bpIds.length) return;
         var lines = entry.bpIds
             .map(function (decId) { return model.getDecorationRange(decId); })
@@ -713,5 +716,31 @@ export function setMonacoReadOnly(readOnly) {
             readOnlyMessage: { value: 'Cannot edit code while debugging. Stop the debug session first.' }
         });
     }
+};
+
+export function setCompileMarkers(docId, markers) {
+    var e = _models.get(docId);
+    if (!e) return;
+    var model = e.model;
+    var lineCount = model.getLineCount();
+    var resolved = [];
+    (markers || []).forEach(function (mk) {
+        if (!(mk.line >= 1) || mk.line > lineCount) return;
+        var maxCol = model.getLineMaxColumn(mk.line);
+        var sCol = mk.startColumn && mk.startColumn >= 1
+            ? Math.min(mk.startColumn, maxCol)
+            : model.getLineFirstNonWhitespaceColumn(mk.line);
+        if (!sCol || sCol < 1) sCol = 1;
+        var eCol = mk.endColumn && mk.endColumn > sCol ? Math.min(mk.endColumn, maxCol) : maxCol;
+        resolved.push({
+            severity: mk.isWarning ? monaco.MarkerSeverity.Warning : monaco.MarkerSeverity.Error,
+            message: mk.message,
+            startLineNumber: mk.line,
+            startColumn: sCol,
+            endLineNumber: mk.line,
+            endColumn: eCol,
+        });
+    });
+    monaco.editor.setModelMarkers(model, COMPILE_MARKER_OWNER, resolved);
 };
 
